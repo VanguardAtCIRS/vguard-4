@@ -1,7 +1,7 @@
 import React from 'react'
 import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { AuthGate } from './components/AuthGate'
+import { ProfessionalAuthGate } from './components/ProfessionalAuthGate'
 import { EnhancedHomePage } from './components/EnhancedHomePage'
 import { AboutPage } from './components/AboutPage'
 import { VisionPage } from './components/VisionPage'
@@ -13,18 +13,26 @@ import { EnhancedFeedbackOverview } from './components/EnhancedFeedbackOverview'
 import { CandidateManagement } from './components/CandidateManagement'
 import { SessionsPage } from './components/SessionsPage'
 import { AllFeedbackPage } from './components/AllFeedbackPage'
+import { UserManagement } from './components/UserManagement'
+import { TeacherFeedbackSystem } from './components/TeacherFeedbackSystem'
+import { AdminFeedbackAnalytics } from './components/AdminFeedbackAnalytics'
+import { User } from './types/auth'
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
 
-  if (!isAuthenticated) {
+  if (!currentUser) {
     return (
-      <AuthGate onAuthenticated={() => setIsAuthenticated(true)}>
+      <ProfessionalAuthGate onAuthenticated={(user) => setCurrentUser(user)}>
         <div />
-      </AuthGate>
+      </ProfessionalAuthGate>
     )
   }
 
+  // Role-based routing
+  if (currentUser.role === 'teacher' || currentUser.role === 'dorm_parent') {
+    return <TeacherFeedbackSystem currentUser={currentUser} />
+  }
   return (
     <Router>
       <Routes>
@@ -36,8 +44,10 @@ function App() {
         <Route path="/documentation/:moduleId" element={<DocumentationPage />} />
         <Route path="/manage-candidates" element={<CandidateManagement />} />
         <Route path="/sessions" element={<SessionsPage />} />
+        <Route path="/manage-users" element={<UserManagement />} />
         <Route path="/all-feedback" element={<AllFeedbackPage />} />
         <Route path="/candidates" element={<EnhancedCandidateSelection />} />
+        <Route path="/feedback-analytics" element={<AdminFeedbackAnalytics />} />
         <Route path="/candidate/:candidateId/class-type" element={<EnhancedClassTypeSelection />} />
         <Route path="/candidate/:candidateId/feedback/:moduleId/:sessionType" element={<EnhancedFeedbackOverview />} />
       </Routes>
@@ -45,4 +55,5 @@ function App() {
   )
 }
 
+  // Admin routes
 export default App
