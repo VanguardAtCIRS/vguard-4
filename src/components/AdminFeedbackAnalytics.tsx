@@ -2,41 +2,45 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BarChart3, Users, GraduationCap, Home, Star, MessageSquare, TrendingUp, Filter } from 'lucide-react'
 import { candidatesWithClasses } from '../data/classes'
-import { FeedbackRating } from '../types/auth'
 import { VanguardScene } from './3D/VanguardScene'
+import { supabase } from '../lib/supabase'
+
+interface FeedbackRating {
+  id: string
+  candidate_id: string
+  reviewer_id: string
+  reviewer_type: 'teacher' | 'dorm_parent'
+  rating: number
+  comments: string
+  created_at: string
+  updated_at: string
+}
 
 export const AdminFeedbackAnalytics: React.FC = () => {
   const [feedbacks, setFeedbacks] = useState<FeedbackRating[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedCandidate, setSelectedCandidate] = useState<string>('all')
   const [selectedReviewerType, setSelectedReviewerType] = useState<string>('all')
 
-  // Mock data - in production this would come from your database
   useEffect(() => {
-    // Generate some sample feedback data
-    const sampleFeedbacks: FeedbackRating[] = [
-      {
-        id: '1',
-        candidate_id: 'aadhya-agarwal',
-        reviewer_id: 'teacher-1',
-        reviewer_type: 'teacher',
-        rating: 8,
-        comments: 'Excellent participation in class discussions',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: '2',
-        candidate_id: 'aadhya-agarwal',
-        reviewer_id: 'dorm-1',
-        reviewer_type: 'dorm_parent',
-        rating: 9,
-        comments: 'Very respectful and helpful to other students',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ]
-    setFeedbacks(sampleFeedbacks)
+    fetchFeedbacks()
   }, [])
+
+  const fetchFeedbacks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('feedback_ratings')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setFeedbacks(data || [])
+    } catch (error) {
+      console.error('Error fetching feedbacks:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredFeedbacks = feedbacks.filter(feedback => {
     const matchesCandidate = selectedCandidate === 'all' || feedback.candidate_id === selectedCandidate
@@ -201,37 +205,47 @@ export const AdminFeedbackAnalytics: React.FC = () => {
                 Teacher Feedback
               </h2>
 
-              <div className="space-y-4">
-                {filteredFeedbacks
-                  .filter(f => f.reviewer_type === 'teacher')
-                  .map((feedback, index) => (
-                    <motion.div
-                      key={feedback.id}
-                      className="bg-blue-500/10 rounded-2xl p-4 border border-blue-500/20"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-bold text-white">{getCandidateName(feedback.candidate_id)}</h3>
-                        <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getRatingColor(feedback.rating)}`}>
-                          {feedback.rating}/10
-                        </span>
-                      </div>
-                      {feedback.comments && (
-                        <p className="text-gray-300 text-sm mb-2">{feedback.comments}</p>
-                      )}
-                      <div className="text-xs text-gray-400">{formatDate(feedback.created_at)}</div>
-                    </motion.div>
-                  ))}
-                
-                {filteredFeedbacks.filter(f => f.reviewer_type === 'teacher').length === 0 && (
-                  <div className="text-center py-8">
-                    <GraduationCap className="w-12 h-12 mx-auto mb-4 text-blue-400/50" />
-                    <p className="text-gray-400">No teacher feedback found</p>
-                  </div>
-                )}
-              </div>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <motion.div 
+                    className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredFeedbacks
+                    .filter(f => f.reviewer_type === 'teacher')
+                    .map((feedback, index) => (
+                      <motion.div
+                        key={feedback.id}
+                        className="bg-blue-500/10 rounded-2xl p-4 border border-blue-500/20"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-bold text-white">{getCandidateName(feedback.candidate_id)}</h3>
+                          <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getRatingColor(feedback.rating)}`}>
+                            {feedback.rating}/10
+                          </span>
+                        </div>
+                        {feedback.comments && (
+                          <p className="text-gray-300 text-sm mb-2">{feedback.comments}</p>
+                        )}
+                        <div className="text-xs text-gray-400">{formatDate(feedback.created_at)}</div>
+                      </motion.div>
+                    ))}
+                  
+                  {filteredFeedbacks.filter(f => f.reviewer_type === 'teacher').length === 0 && (
+                    <div className="text-center py-8">
+                      <GraduationCap className="w-12 h-12 mx-auto mb-4 text-blue-400/50" />
+                      <p className="text-gray-400">No teacher feedback found</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
 
             {/* Dorm Parent Feedback Section */}
@@ -246,37 +260,47 @@ export const AdminFeedbackAnalytics: React.FC = () => {
                 Dorm Parent Feedback
               </h2>
 
-              <div className="space-y-4">
-                {filteredFeedbacks
-                  .filter(f => f.reviewer_type === 'dorm_parent')
-                  .map((feedback, index) => (
-                    <motion.div
-                      key={feedback.id}
-                      className="bg-green-500/10 rounded-2xl p-4 border border-green-500/20"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-bold text-white">{getCandidateName(feedback.candidate_id)}</h3>
-                        <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getRatingColor(feedback.rating)}`}>
-                          {feedback.rating}/10
-                        </span>
-                      </div>
-                      {feedback.comments && (
-                        <p className="text-gray-300 text-sm mb-2">{feedback.comments}</p>
-                      )}
-                      <div className="text-xs text-gray-400">{formatDate(feedback.created_at)}</div>
-                    </motion.div>
-                  ))}
-                
-                {filteredFeedbacks.filter(f => f.reviewer_type === 'dorm_parent').length === 0 && (
-                  <div className="text-center py-8">
-                    <Home className="w-12 h-12 mx-auto mb-4 text-green-400/50" />
-                    <p className="text-gray-400">No dorm parent feedback found</p>
-                  </div>
-                )}
-              </div>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <motion.div 
+                    className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredFeedbacks
+                    .filter(f => f.reviewer_type === 'dorm_parent')
+                    .map((feedback, index) => (
+                      <motion.div
+                        key={feedback.id}
+                        className="bg-green-500/10 rounded-2xl p-4 border border-green-500/20"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-bold text-white">{getCandidateName(feedback.candidate_id)}</h3>
+                          <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getRatingColor(feedback.rating)}`}>
+                            {feedback.rating}/10
+                          </span>
+                        </div>
+                        {feedback.comments && (
+                          <p className="text-gray-300 text-sm mb-2">{feedback.comments}</p>
+                        )}
+                        <div className="text-xs text-gray-400">{formatDate(feedback.created_at)}</div>
+                      </motion.div>
+                    ))}
+                  
+                  {filteredFeedbacks.filter(f => f.reviewer_type === 'dorm_parent').length === 0 && (
+                    <div className="text-center py-8">
+                      <Home className="w-12 h-12 mx-auto mb-4 text-green-400/50" />
+                      <p className="text-gray-400">No dorm parent feedback found</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </div>
         </div>

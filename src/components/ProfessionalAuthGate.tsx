@@ -21,6 +21,38 @@ export const ProfessionalAuthGate: React.FC<ProfessionalAuthGateProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [isSuccess, setIsSuccess] = useState(false)
+  const [shieldClicks, setShieldClicks] = useState(0)
+  const [showAdminAccess, setShowAdminAccess] = useState(false)
+
+  const handleShieldClick = () => {
+    const newClickCount = shieldClicks + 1
+    setShieldClicks(newClickCount)
+    
+    if (newClickCount === 6) {
+      setShowAdminAccess(true)
+      // Create admin user directly
+      const adminUser: UserType = {
+        id: 'admin-secret',
+        username: 'Admin',
+        password: 'secret',
+        full_name: 'Vanguard Administrator',
+        role: 'admin',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      setIsSuccess(true)
+      setTimeout(() => {
+        onAuthenticated(adminUser)
+      }, 1000)
+    }
+    
+    // Reset clicks after 3 seconds if not reached 6
+    if (newClickCount < 6) {
+      setTimeout(() => {
+        setShieldClicks(0)
+      }, 3000)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,7 +62,7 @@ export const ProfessionalAuthGate: React.FC<ProfessionalAuthGateProps> = ({
     // Simulate loading time
     await new Promise(resolve => setTimeout(resolve, 800))
 
-    const user = authenticateUser(credentials.username, credentials.password)
+    const user = await authenticateUser(credentials.username, credentials.password)
     
     if (user) {
       setIsSuccess(true)
@@ -87,7 +119,7 @@ export const ProfessionalAuthGate: React.FC<ProfessionalAuthGateProps> = ({
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            Welcome to Vanguard
+            {showAdminAccess ? 'Welcome, Administrator' : 'Welcome to Vanguard'}
           </motion.p>
         </motion.div>
       </motion.div>
@@ -120,7 +152,7 @@ export const ProfessionalAuthGate: React.FC<ProfessionalAuthGateProps> = ({
             transition={{ duration: 0.6, delay: 0.2 }}
           >
             <motion.div
-              className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl"
+              className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl cursor-pointer relative"
               animate={{ 
                 boxShadow: [
                   "0 0 20px rgba(59, 130, 246, 0.4)",
@@ -129,12 +161,40 @@ export const ProfessionalAuthGate: React.FC<ProfessionalAuthGateProps> = ({
                 ]
               }}
               transition={{ duration: 2, repeat: Infinity }}
+              onClick={handleShieldClick}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
             >
               <Shield className="w-10 h-10 text-white" />
+              
+              {/* Click indicator */}
+              <AnimatePresence>
+                {shieldClicks > 0 && shieldClicks < 6 && (
+                  <motion.div
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                  >
+                    {shieldClicks}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
             
             <h1 className="text-3xl font-bold text-white mb-2">Vanguard Portal</h1>
             <p className="text-blue-200">Secure Access to Feedback System</p>
+            
+            {shieldClicks > 0 && shieldClicks < 6 && (
+              <motion.p 
+                className="text-yellow-300 text-sm mt-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                {6 - shieldClicks} more clicks for admin access
+              </motion.p>
+            )}
           </motion.div>
 
           {/* Login Form */}
@@ -229,6 +289,15 @@ export const ProfessionalAuthGate: React.FC<ProfessionalAuthGateProps> = ({
               <p className="text-center text-blue-200 text-sm">
                 Secure access to the Vanguard feedback system
               </p>
+              {shieldClicks > 0 && shieldClicks < 6 && (
+                <motion.p 
+                  className="text-center text-yellow-300 text-xs mt-2"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  Secret admin access: {shieldClicks}/6 clicks
+                </motion.p>
+              )}
             </div>
           </motion.div>
         </motion.div>

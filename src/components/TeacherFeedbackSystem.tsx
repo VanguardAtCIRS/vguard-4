@@ -2,8 +2,20 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { User, Star, MessageSquare, Plus, Search } from 'lucide-react'
 import { candidatesWithClasses } from '../data/classes'
-import { User as UserType, FeedbackRating } from '../types/auth'
+import { User as UserType } from '../types/auth'
 import { VanguardScene } from './3D/VanguardScene'
+import { supabase } from '../lib/supabase'
+
+interface FeedbackRating {
+  id: string
+  candidate_id: string
+  reviewer_id: string
+  reviewer_type: 'teacher' | 'dorm_parent'
+  rating: number
+  comments: string
+  created_at: string
+  updated_at: string
+}
 
 interface TeacherFeedbackSystemProps {
   currentUser: UserType
@@ -14,36 +26,67 @@ export const TeacherFeedbackSystem: React.FC<TeacherFeedbackSystemProps> = ({ cu
   const [feedbacks, setFeedbacks] = useState<FeedbackRating[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [newFeedback, setNewFeedback] = useState({
     rating: 5,
     comments: ''
   })
 
+  useEffect(() => {
+    fetchFeedbacks()
+  }, [currentUser.id])
+
+  const fetchFeedbacks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('feedback_ratings')
+        .select('*')
+        .eq('reviewer_id', currentUser.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setFeedbacks(data || [])
+    } catch (error) {
+      console.error('Error fetching feedbacks:', error)
+    }
+  }
+
   const filteredCandidates = candidatesWithClasses.filter(candidate =>
     candidate.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleSubmitFeedback = () => {
+  const handleSubmitFeedback = async () => {
     if (!selectedCandidate) return
 
-    const feedback: FeedbackRating = {
-      id: `feedback-${Date.now()}`,
-      candidate_id: selectedCandidate,
-      reviewer_id: currentUser.id,
-      reviewer_type: currentUser.role as 'teacher' | 'dorm_parent',
-      rating: newFeedback.rating,
-      comments: newFeedback.comments,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
+    setIsSubmitting(true)
+    
+    try {
+      const { error } = await supabase
+        .from('feedback_ratings')
+        .insert([{
+          candidate_id: selectedCandidate,
+          reviewer_id: currentUser.id,
+          reviewer_type: currentUser.role as 'teacher' | 'dorm_parent',
+          rating: newFeedback.rating,
+          comments: newFeedback.comments
+        }])
 
-    setFeedbacks(prev => [feedback, ...prev])
-    setNewFeedback({ rating: 5, comments: '' })
-    setShowFeedbackModal(false)
+      if (error) throw error
+
+      await fetchFeedbacks()
+      setNewFeedback({ rating: 5, comments: '' })
+      setShowFeedbackModal(false)
+      setSelectedCandidate(null)
+    } catch (error) {
+      console.error('Error submitting feedback:', error)
+      alert('Failed to submit feedback. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const getCandidateFeedbacks = (candidateId: string) => {
-    return feedbacks.filter(f => f.candidate_id === candidateId && f.reviewer_id === currentUser.id)
+    return feedbacks.filter(f => f.candidate_id === candidateId)
   }
 
   const getAverageRating = (candidateId: string) => {
@@ -67,6 +110,10 @@ export const TeacherFeedbackSystem: React.FC<TeacherFeedbackSystemProps> = ({ cu
     if (rating >= 4) return 'text-orange-600 bg-orange-100'
     return 'text-red-600 bg-red-100'
   }
+
+  const selectedCandidateName = selectedCandidate 
+    ? candidatesWithClasses.find(c => c.id === selectedCandidate)?.name 
+    : ''
 
   return (
     <VanguardScene>
@@ -232,7 +279,7 @@ export const TeacherFeedbackSystem: React.FC<TeacherFeedbackSystemProps> = ({ cu
                 
                 <div className="mb-6">
                   <h4 className="font-semibold text-gray-700 mb-2">
-                    {candidatesWithClasses.find(c => c.id === selectedCandidate)?.name}
+                    {selectedCandidateName}
                   </h4>
                   <p className="text-gray-500 text-sm">
                     Providing feedback as: {currentUser.role === 'teacher' ? 'Teacher' : 'Dorm Parent'}
@@ -289,14 +336,16 @@ export const TeacherFeedbackSystem: React.FC<TeacherFeedbackSystemProps> = ({ cu
                       setNewFeedback({ rating: 5, comments: '' })
                     }}
                     className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                    disabled={isSubmitting}
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSubmitFeedback}
-                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+                    disabled={isSubmitting}
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Submit Feedback
+                    {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
                   </button>
                 </div>
               </motion.div>

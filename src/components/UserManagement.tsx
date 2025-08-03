@@ -7,6 +7,7 @@ import { User as UserType } from '../types/auth'
 
 export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserType[]>([])
+  const [loading, setLoading] = useState(true)
   const [showAddUser, setShowAddUser] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -23,46 +24,61 @@ export const UserManagement: React.FC = () => {
     fetchUsers()
   }, [])
 
-  const fetchUsers = () => {
-    setUsers(getAllUsers())
+  const fetchUsers = async () => {
+    setLoading(true)
+    const fetchedUsers = await getAllUsers()
+    setUsers(fetchedUsers)
+    setLoading(false)
   }
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newUser.username.trim() || !newUser.password.trim() || !newUser.full_name.trim()) {
       alert('Please fill in all fields')
       return
     }
 
     try {
-      createUser(newUser)
-      fetchUsers()
-      setNewUser({ username: '', password: '', full_name: '', role: 'teacher' })
-      setShowAddUser(false)
+      const createdUser = await createUser(newUser)
+      if (createdUser) {
+        await fetchUsers()
+        setNewUser({ username: '', password: '', full_name: '', role: 'teacher' })
+        setShowAddUser(false)
+      } else {
+        alert('Failed to add user - username might already exist')
+      }
     } catch (error) {
       console.error('Error adding user:', error)
       alert('Failed to add user')
     }
   }
 
-  const handleUpdateUser = () => {
+  const handleUpdateUser = async () => {
     if (!editingUser) return
 
     try {
-      updateUser(editingUser.id, editingUser)
-      fetchUsers()
-      setEditingUser(null)
+      const updatedUser = await updateUser(editingUser.id, editingUser)
+      if (updatedUser) {
+        await fetchUsers()
+        setEditingUser(null)
+      } else {
+        alert('Failed to update user')
+      }
     } catch (error) {
       console.error('Error updating user:', error)
       alert('Failed to update user')
     }
   }
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return
 
     try {
-      deleteUser(userId)
-      fetchUsers()
+      const success = await deleteUser(userId)
+      if (success) {
+        await fetchUsers()
+      } else {
+        alert('Failed to delete user')
+      }
     } catch (error) {
       console.error('Error deleting user:', error)
       alert('Failed to delete user')
@@ -183,52 +199,62 @@ export const UserManagement: React.FC = () => {
               System Users ({filteredUsers.length})
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <AnimatePresence>
-                {filteredUsers.map((user, index) => {
-                  const RoleIcon = getRoleIcon(user.role)
-                  return (
-                    <motion.div
-                      key={user.id}
-                      className="bg-blue-500/10 backdrop-blur-sm rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300"
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ delay: index * 0.05 }}
-                      whileHover={{ scale: 1.02, y: -5 }}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                          <RoleIcon className="w-5 h-5 text-blue-400" />
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <motion.div 
+                  className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <AnimatePresence>
+                  {filteredUsers.map((user, index) => {
+                    const RoleIcon = getRoleIcon(user.role)
+                    return (
+                      <motion.div
+                        key={user.id}
+                        className="bg-blue-500/10 backdrop-blur-sm rounded-2xl p-6 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ delay: index * 0.05 }}
+                        whileHover={{ scale: 1.02, y: -5 }}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                            <RoleIcon className="w-5 h-5 text-blue-400" />
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => setEditingUser(user)}
+                              className="p-1 hover:bg-blue-500/20 rounded text-blue-400"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="p-1 hover:bg-red-500/20 rounded text-red-400"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => setEditingUser(user)}
-                            className="p-1 hover:bg-blue-500/20 rounded text-blue-400"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="p-1 hover:bg-red-500/20 rounded text-red-400"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <h3 className="font-bold text-white mb-2">{user.full_name}</h3>
-                      <p className="text-gray-400 text-sm mb-3">@{user.username}</p>
-                      
-                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${getRoleColor(user.role)}`}>
-                        <RoleIcon className="w-4 h-4" />
-                        {getRoleName(user.role)}
-                      </span>
-                    </motion.div>
-                  )
-                })}
-              </AnimatePresence>
-            </div>
+                        
+                        <h3 className="font-bold text-white mb-2">{user.full_name}</h3>
+                        <p className="text-gray-400 text-sm mb-3">@{user.username}</p>
+                        
+                        <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${getRoleColor(user.role)}`}>
+                          <RoleIcon className="w-4 h-4" />
+                          {getRoleName(user.role)}
+                        </span>
+                      </motion.div>
+                    )
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
           </motion.div>
         </div>
 
